@@ -184,3 +184,4 @@ with tab_elenco:
                 salva_dati(st.session_state.dati)
                 st.success(f"La prenotazione di {prenotazione_scelta['cliente']} è stata eliminata.")
                 st.rerun()
+`

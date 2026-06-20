@@ -1,0 +1,242 @@
+{
+    "ospiti": [
+        {
+            "nome": "bruno",
+            "cognome": "balestrieri",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "marcela",
+            "cognome": "halamikova palkova",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "claudia",
+            "cognome": "loiodice",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "ALESSANDRA",
+            "cognome": "GHERSI",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "CHIARA",
+            "cognome": "PELLEGRINO",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "MARCO",
+            "cognome": "GIACOBAZZI",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "EMANUELE",
+            "cognome": "SANTINI",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "PAOLA",
+            "cognome": "PATRUNO",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "PIA",
+            "cognome": "PAROLINI",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "ANTONINO",
+            "cognome": "NIFOSI'",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "FABRIZION  PAOLO SALVATORE",
+            "cognome": "SANDINU",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "MARIE",
+            "cognome": "PONS",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "CARLO",
+            "cognome": "CASTANO",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "KAMILLA",
+            "cognome": "BOLTUC",
+            "telefono": "",
+            "email": ""
+        },
+        {
+            "nome": "ROBERTO",
+            "cognome": "QUARISA",
+            "telefono": "3460913066",
+            "email": ""
+        },
+        {
+            "nome": "SILVANA",
+            "cognome": "SDAU",
+            "telefono": "3403123776",
+            "email": ""
+        },
+        {
+            "nome": "VALERIO",
+            "cognome": "ROCCHETTI",
+            "telefono": "3485627555",
+            "email": ""
+        },
+        {
+            "nome": "pasquale",
+            "cognome": "cocatrix",
+            "telefono": "33 699187901",
+            "email": ""
+        },
+        {
+            "nome": "EMIDIO",
+            "cognome": "GROTTOLA",
+            "telefono": "3282796232",
+            "email": ""
+        },
+        {
+            "nome": "ROBERTO",
+            "cognome": "QUARISA",
+            "telefono": "3460913066",
+            "email": ""
+        },
+        {
+            "nome": "PASQUAE",
+            "cognome": "MEMOLA",
+            "telefono": "NATO TERLIZZI 04/11/1973",
+            "email": ""
+        },
+        {
+            "nome": "ALESSANDRO",
+            "cognome": "ULGHARAITA",
+            "telefono": "NATO TORREDELGRECO 15/08/1973",
+            "email": ""
+        }
+    ],
+    "stanze": [
+        {
+            "nome": "Casa Mariateressa - Singola",
+            "posti": 1
+        },
+        {
+            "nome": "Casa Mariateressa - Doppia",
+            "posti": 2
+        },
+        {
+            "nome": "Casa Mariateressa - Tripla",
+            "posti": 3
+        },
+        {
+            "nome": "Casa Mariateressa - Quadrupla",
+            "posti": 4
+        },
+        {
+            "nome": "Casa Antonetta - Singola",
+            "posti": 1
+        },
+        {
+            "nome": "Casa Antonetta - Doppia",
+            "posti": 2
+        },
+        {
+            "nome": "Casa Antonetta - Tripla",
+            "posti": 3
+        },
+        {
+            "nome": "Casa Antonetta - Quadrupla",
+            "posti": 4
+        },
+        {
+            "nome": "Casa Peppino - Singola",
+            "posti": 1
+        },
+        {
+            "nome": "Casa Peppino - Doppia",
+            "posti": 2
+        },
+        {
+            "nome": "Casa Peppino - Tripla",
+            "posti": 3
+        },
+        {
+            "nome": "Casa Peppino - Quadrupla",
+            "posti": 4
+        }
+    ],
+    "prenotazioni": [
+        {
+            "ospite": 14,
+            "stanza": 0,
+            "check_in": "2026-05-22",
+            "check_out": "2026-05-25"
+        },
+        {
+            "ospite": 15,
+            "stanza": 3,
+            "check_in": "2026-08-28",
+            "check_out": "2026-08-30"
+        },
+        {
+            "ospite": 15,
+            "stanza": 9,
+            "check_in": "2026-08-28",
+            "check_out": "2026-08-30"
+        },
+        {
+            "ospite": 16,
+            "stanza": 5,
+            "check_in": "2026-08-28",
+            "check_out": "2026-08-30"
+        },
+        {
+            "ospite": 17,
+            "stanza": 9,
+            "check_in": "2026-05-14",
+            "check_out": "2026-05-15"
+        },
+        {
+            "ospite": 18,
+            "stanza": 0,
+            "check_in": "2026-05-31",
+            "check_out": "2026-06-03"
+        },
+        {
+            "ospite": 19,
+            "stanza": 1,
+            "check_in": "2026-05-22",
+            "check_out": "2026-05-25"
+        },
+        {
+            "ospite": 20,
+            "stanza": 8,
+            "check_in": "2026-06-17",
+            "check_out": "2026-06-20"
+        },
+        {
+            "ospite": 21,
+            "stanza": 3,
+            "check_in": "2026-06-19",
+            "check_out": "2026-06-20"
+        }
+    ]
+}

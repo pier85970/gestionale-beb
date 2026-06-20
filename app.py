@@ -57,8 +57,8 @@ class GestionaleBnb:
         
         # LINK ICAL DI BOOKING.COM (Sostituisci questi URL con i tuoi link reali presi dall'extranet di Booking)
         self.URL_ICAL_BOOKING = {
-            "Casa Mariateressa": "https://ical.booking.com/v1/export?t=a6882451-6b55-47e3-990b-ddcc2be78ec2"
-            "Casa Antonetta": "https://ical.booking.com/v1/export?t=b5998ab5-6b80-4574-bbae-91543acbbf08"
+            "Casa Mariateressa": "https://ical.booking.com/v1/export?t=a6882451-6b55-47e3-990b-ddcc2be78ec2",
+            "Casa Antonetta": "https://ical.booking.com/v1/export?t=b5998ab5-6b80-4574-bbae-91543acbbf08",
             "Casa Peppino": "https://ical.booking.com/v1/export?t=76e590db-7cb7-40fe-81e6-ab406552ea5a"
         }
         

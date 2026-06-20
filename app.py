@@ -17,7 +17,6 @@ if "camere" not in st.session_state:
     }
 
 if "prenotazioni" not in st.session_state:
-    # Alcuni dati di esempio iniziali per vedere subito la griglia popolata
     oggi = datetime.now().date()
     st.session_state.prenotazioni = [
         {
@@ -36,12 +35,10 @@ if "prenotazioni" not in st.session_state:
 
 # 2. FUNZIONI DI CONTROLLO
 def controlla_overbooking(camera, check_in, check_out):
-    """Restituisce True se c'è un conflitto di date per la camera selezionata"""
     for p in st.session_state.prenotazioni:
         if p["camera"] == camera:
-            # Formula di sovrapposizione intervalli temporali
             if check_in < p["check_out"] and check_out > p["check_in"]:
-                return p # Ritorna la prenotazione conflittuale
+                return p
     return None
 
 # Creazione delle schede nell'interfaccia
@@ -54,12 +51,10 @@ with tab1:
     st.header("🗓️ Griglia delle Occupazioni")
     st.write("Visualizzazione dei prossimi 15 giorni. In **Verde (Libero)**, in **Rosso (Occupato)** con il nome del cliente.")
     
-    # Genera i prossimi 15 giorni a partire da oggi
     data_inizio = datetime.now().date()
     giorni = [data_inizio + timedelta(days=i) for i in range(15)]
     colonne_date = [d.strftime("%d/%m") for d in giorni]
     
-    # Costruiamo la matrice per il DataFrame
     matrice_dati = []
     elenco_camere = sorted(list(st.session_state.camere.keys()))
     
@@ -78,7 +73,6 @@ with tab1:
     
     df_griglia = pd.DataFrame(matrice_dati)
     
-    # Funzione per colorare le celle del DataFrame Streamlit
     def colora_celle(val):
         if "🔴" in str(val):
             return "background-color: #ffcccc; color: #cc0000; font-weight: bold;"
@@ -99,7 +93,6 @@ with tab2:
         col1, col2 = st.columns(2)
         with col1:
             cliente = st.text_input("Nome e Cognome Cliente:")
-            # Crea la lista delle camere formattata per il menu a tendina
             opzioni_camere = [f"{k} - {v}" for k, v in st.session_state.camere.items()]
             camera_scelta_completa = st.selectbox("Seleziona Camera:", opzioni_camere)
             camera_id = camera_scelta_completa.split(" - ")[0] if camera_scelta_completa else None
@@ -108,7 +101,8 @@ with tab2:
             check_in = st.date_input("Data di Check-In:", datetime.now().date())
             check_out = st.date_input("Data di Check-Out:", datetime.now().date() + timedelta(days=1))
             
-        submit = st.form_submit_with_button("Salva Prenotazione")
+        # RIGA CORRETTA QUI:
+        submit = st.form_submit_button("Salva Prenotazione")
         
         if submit:
             if not cliente:
@@ -118,13 +112,11 @@ with tab2:
             elif camera_id is None:
                 st.error("⚠️ Nessuna camera selezionata!")
             else:
-                # Controllo Overbooking attivo
                 conflitto = controlla_overbooking(camera_id, check_in, check_out)
                 
                 if conflitto:
                     st.error(f"❌ IMPOSSIBILE SALVARE: La camera {camera_id} è già occupata in queste date da **{conflitto['cliente']}** (dal {conflitto['check_in'].strftime('%d/%m')} al {conflitto['check_out'].strftime('%d/%m')})!")
                 else:
-                    # Se tutto è ok, salva nel database temporaneo
                     nuova_p = {
                         "cliente": cliente,
                         "camera": camera_id,
@@ -135,7 +127,6 @@ with tab2:
                     st.success(f"🎉 Prenotazione salvata con successo per {cliente} in Camera {camera_id}!")
                     st.rerun()
 
-    # Tabella riepilogativa testuale sotto il form
     st.subheader("📋 Elenco Totale Prenotazioni")
     if st.session_state.prenotazioni:
         dati_tabella = []

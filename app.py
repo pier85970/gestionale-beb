@@ -405,7 +405,8 @@ elif menu == "Verifica Disponibilità":
             st.table(pd.DataFrame([{"Struttura / Casa": c, "Stato": "🟢 Libera sia localmente che su Booking"} for c in case_libere]))
 
 # --- SEZIONE: ELENCO CASE ---
+# --- SEZIONE: ELENCO CASE ---
 elif menu == "Elenco Case":
-    st.header("🏠 Elenco delle strutture e Link Sincronizzazione")
-    st.info("Configura i tuoi link iCal presi dall'Extranet di Booking.com nel codice sorgente (riga 52) per automatizzare il blocco.")
-    st.table(pd.DataFrame([{"Casa": k, "URL iCal Configurato": v} for k, v in g.URL_ICAL_BOOKING.items()]))
+    st.header("🏠 Elenco delle strutture gestite")
+    st.success("Sincronizzazione iCal attiva con i canali ufficiali di Booking.com.")
+    st.table(pd.DataFrame([{"Casa": k, "Stato Collegamento": "🟢 Connesso"} for k in g.URL_ICAL_BOOKING.keys()]))

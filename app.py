@@ -113,8 +113,8 @@ class GestionaleBnb:
                 except: continue
         except FileNotFoundError:
             case = ["Casa Mariateressa", "Casa Antonetta", "Casa Peppino"]
-            tipologie = [("Singola", 1), ("Doppia", 2), ("Tripla", 3), ("Quadrupla", 4)]
-            self.stanze = [Stanza(f"{c} - {t}", posti) for c in case for t, posti in tipologie]
+            tipologies = [("Singola", 1), ("Doppia", 2), ("Tripla", 3), ("Quadrupla", 4)]
+            self.stanze = [Stanza(f"{c} - {t}", posti) for c in case for t, posti in tipologies]
             self._salva()
         self.rigenera_mappa_occupazione()
 
@@ -151,9 +151,47 @@ menu = st.sidebar.radio("Navigazione Menu", ["Prenotazioni", "Anagrafica Ospiti"
 if menu == "Prenotazioni":
     st.header("📆 Registro Prenotazioni")
     
+    # ---------------------------------------------------------
+    # MIGLIORIA 1: TABELLONE VISIVO DISPONIBILITÀ (Prossimi 15 giorni)
+    # ---------------------------------------------------------
+    st.subheader("🗓️ Tabellone Occupazione Real-Time (Prossimi 15 Giorni)")
+    
+    data_inizio = date.today()
+    giorni_tabellone = [data_inizio + timedelta(days=i) for i in range(15)]
+    colonne_date = [d.strftime("%d/%m") for d in giorni_tabellone]
+    
+    matrice_dati = []
+    # Raggruppiamo la visualizzazione per le stanze reali presenti
+    for s in g.stanze:
+        riga = {"Soluzione / Camera": s.nome}
+        casa_nome = s.nome.split(" - ")[0]
+        
+        for d in giorni_tabellone:
+            nome_ospite = "🟢 Libero"
+            # Cerca se c'è un ospite che occupa specificatamente questa configurazione di stanza
+            for p in g.prenotazioni:
+                if p.stanza.nome == s.nome and p.check_in <= d < p.check_out:
+                    nome_ospite = f"🔴 {p.ospite.nome} {p.ospite.cognome}"
+                    break
+            riga[d.strftime("%d/%m")] = nome_ospite
+        matrice_dati.append(riga)
+        
+    df_griglia = pd.DataFrame(matrice_dati)
+    
+    def colora_celle(val):
+        if "🔴" in str(val):
+            return "background-color: #ffcccc; color: #cc0000; font-weight: bold;"
+        if "🟢" in str(val):
+            return "background-color: #e2f0d9; color: #385723;"
+        return ""
+    
+    df_stilizzato = df_griglia.style.map(colora_celle, subset=colonne_date)
+    st.dataframe(df_stilizzato, use_container_width=True, hide_index=True)
+    st.divider()
+    
     # Filtro Anno
     anni = sorted(list({p.check_in.year for p in g.prenotazioni} | {date.today().year}), reverse=True)
-    anno_sel = st.selectbox("Filtra per anno", anni)
+    anno_sel = st.selectbox("Filtra elenco testuale per anno", anni)
     
     # Tabella Prenotazioni
     pren_filtrate = [
@@ -195,12 +233,13 @@ if menu == "Prenotazioni":
                 if c_in >= c_out:
                     st.error("Il check-out deve essere successivo al check-in!")
                 else:
+                    # Sfrutta il tuo sistema di controllo disponibilità nativo
                     stanze_libere = g.stanze_disponibili(c_in, c_out)
                     if not stanze_libere:
-                        st.error("Nessuna stanza o posto letto disponibile per queste date.")
+                        st.error("❌ Limite massimo di posti (4 l.) superato o stanze non disponibili per queste date!")
                     else:
                         stanze_nomi = [s.nome for s in stanze_libere]
-                        stanza_scelta_nome = st.selectbox("Seleziona Stanza/Casa", stanze_nomi, key="new_p_st")
+                        stanza_scelta_nome = st.selectbox("Seleziona Stanza/Casa disponibile", stanze_nomi, key="new_p_st")
                         
                         if st.button("Salva Prenotazione", type="primary"):
                             stanza_obj = next(s for s in g.stanze if s.nome == stanza_scelta_nome)
@@ -229,7 +268,6 @@ if menu == "Prenotazioni":
                     st.error("Il check-out deve essere successivo al check-in!")
                 else:
                     stanze_libere = g.stanze_disponibili(c_in, c_out, ignora_idx=pren_idx)
-                    # Forziamo l'inclusione della sua stanza attuale se non compare
                     stanze_nomi = list({s.nome for s in stanze_libere} | {p_da_mod.stanza.nome})
                     try: curr_st_idx = stanze_nomi.index(p_da_mod.stanza.nome)
                     except: curr_st_idx = 0

@@ -43,15 +43,17 @@ class GestionaleBnb:
         self.ELENCO_CASE = ["Casa Mariateresa", "Casa Antonetta", "Casa Peppino"]
         self.stanze = [Stanza(c, max_ospiti=4) for c in self.ELENCO_CASE]
         
+        # CONTROLLA QUESTI LINK: Sostituisci i placeholder con i tuoi link reali di Booking
         self.URL_ICAL_BOOKING = {
-            "Casa Mariateresa": "https://ical.booking.com/v1/export?t=INSERISCI_QUI_IL_LINK_MARIATERESA", 
-            "Casa Antonetta": "https://ical.booking.com/v1/export?t=b5998ab5-6b80-4574-bbae-91543acbbf08",
-            "Casa Peppino": "https://ical.booking.com/v1/export?t=INSERISCI_QUI_IL_LINK_PEPPINO"
+            "Casa Mariateresa": "https://ical.booking.com/v1/export?t=5bcde36e-d0a7-4d79-b30d-a777dc7378c6", # REALE 
+            "Casa Antonetta": "https://ical.booking.com/v1/export?t=b5998ab5-6b80-4574-bbae-91543acbbf08", # REALE
+            "Casa Peppino": "https://ical.booking.com/v1/export?t=04546f5f-8e34-4fb7-b94e-3c1e2f274780" # REALE
         }
         
         self.ospiti = []
         self.prenotazioni = []
         self.prenotazioni_booking = []
+        self.errori_sincronizzazione = [] # Registro per vedere cosa non va
         
         self._carica_dati()
 
@@ -131,26 +133,42 @@ class GestionaleBnb:
             self.prenotazioni.remove(prenotazione_obj)
             self._salva_prenotazioni()
 
+    # LOGICA DI SINCRONIZZAZIONE PROTETTA ED ESPOSITIVA
     def sincronizza_booking(self):
         self.prenotazioni_booking = []
+        self.errori_sincronizzazione = []
         ospite_fittizio = Ospite(0, "Cliente", "Booking.com", "Online", "2000-01-01", "M", "ONLINE")
+        
         for nome_casa, url in self.URL_ICAL_BOOKING.items():
-            if not url or "INSERISCI_QUI" in url: continue
+            if not url or "INSERISCI_QUI" in url: 
+                self.errori_sincronizzazione.append(f"⚠️ {nome_casa}: Link non configurato (Usa quello di esempio).")
+                continue
             try:
-                risposta = requests.get(url, timeout=10)
+                risposta = requests.get(url, timeout=12)
                 if risposta.status_code == 200:
                     cal = Calendar.from_ical(risposta.text)
                     stanza_sel = next((s for s in self.stanze if s.nome == nome_casa), None)
                     if stanza_sel:
+                        contatore_casa = 0
                         for componente in cal.walk():
                             if componente.name == "VEVENT":
-                                cin_dt = componente.get('dtstart').dt
-                                cout_dt = componente.get('dtend').dt
-                                cin = cin_dt.date() if isinstance(cin_dt, datetime) else cin_dt
-                                cout = cout_dt.date() if isinstance(cout_dt, datetime) else cout_dt
-                                if not cin or not cout: continue
-                                self.prenotazioni_booking.append(Prenotazione(ospite_fittizio, stanza_sel, cin, cout, 2, False, "Booking"))
-            except Exception: pass
+                                try:
+                                    cin_dt = componente.get('dtstart').dt
+                                    cout_dt = componente.get('dtend').dt
+                                    cin = cin_dt.date() if isinstance(cin_dt, datetime) else cin_dt
+                                    cout = cout_dt.date() if isinstance(cout_dt, datetime) else cout_dt
+                                    if not cin or not cout: continue
+                                    
+                                    self.prenotazioni_booking.append(Prenotazione(ospite_fittizio, stanza_sel, cin, cout, 2, False, "Booking"))
+                                    contatore_casa += 1
+                                except Exception:
+                                    pass # Salta la singola prenotazione corrotta, non tutto il calendario!
+                        if contatore_casa == 0:
+                            self.errori_sincronizzazione.append(f"ℹ️ {nome_casa}: Connesso correttamente, ma il file iCal è vuoto.")
+                else:
+                    self.errori_sincronizzazione.append(f"❌ {nome_casa}: Booking ha risposto con errore (Stato {risposta.status_code}).")
+            except Exception as e:
+                self.errori_sincronizzazione.append(f"❌ {nome_casa}: Impossibile scaricare i dati (Timeout o connessione assente).")
 
     def tutte_le_prenotazioni(self):
         return self.prenotazioni + self.prenotazioni_booking
@@ -197,10 +215,19 @@ if st.sidebar.button("🔄 Sincronizza Booking", type="primary"):
     st.sidebar.success("Sincronizzato!")
     st.rerun()
 
+# MOSTRA STATO DEI LINK NELLA SIDEBAR PER CONVALIDA
+if g.errori_sincronizzazione:
+    st.sidebar.markdown("### ⚠️ Stato Canali")
+    for err in g.errori_sincronizzazione:
+        st.sidebar.info(err)
+
 # --- SEZIONE 1: TABELLONE INTERATTIVO ---
 if menu == "Tabellone Disponibilità":
     st.header("📅 Tabellone Occupazione Case")
-    st.caption("Clicca su un blocco rosso (prenotazione manuale) per modificarla al volo.")
+    
+    # AVVISO IMPORTANTE PER L'UTENTE
+    st.info("💡 **Per vedere le prenotazioni di Agosto:** Clicca sul campo qui sotto 'Data inizio visualizzazione' e scegli un giorno di Agosto.")
+    
     col1, col2 = st.columns(2)
     with col1: data_inizio = st.date_input("Data inizio visualizzazione", date.today())
     with col2: giorni_mostrati = st.slider("Giorni da mostrare", 5, 15, 10)
@@ -219,7 +246,7 @@ if menu == "Tabellone Disponibilità":
                         break
                 if trovata:
                     if trovata.sorgente == "Booking":
-                        st.button("🌐 Booking", key=f"btn_{casa}_{d}", use_container_width=True)
+                        st.button("🌐 Booking", key=f"btn_{casa}_{d}", use_container_width=True, help=f"Dal {trovata.check_in.strftime('%d/%m')} al {trovata.check_out.strftime('%d/%m')}")
                     else:
                         col_icon = "🥐" if trovata.colazione else "❌"
                         label = f"🔴 {trovata.ospite.cognome[:7].upper()}\n{trovata.numero_ospiti}👥 {col_icon}"
@@ -240,8 +267,7 @@ if menu == "Tabellone Disponibilità":
                 label="🚓 Scarica File per Alloggiati Web (Polizia)",
                 data=testo_alloggiati,
                 file_name=f"alloggiati_{p_mod.ospite.cognome}_{p_mod.check_in}.txt",
-                mime="text/plain",
-                help="Scarica il file .txt pronto da caricare sul portale della Polizia di Stato."
+                mime="text/plain"
             )
             
             with st.form("form_modifica_rapida"):
@@ -281,29 +307,22 @@ if menu == "Tabellone Disponibilità":
                     st.rerun()
         else: st.session_state.p_da_modificare = None
 
-# --- SEZIONE MODIFICATA: PULIZIE CON 2 COLONNE ---
+# --- SEZIONE PULIZIE ---
 elif menu == "🧹 Pulizie & Dashboard Giornaliera":
     st.header("🧹 Piano di Lavoro Giornaliero")
     oggi = st.date_input("Seleziona Giorno di lavoro", date.today())
-    
     st.markdown(f"### Elenco attività operative per il giorno: **{oggi.strftime('%d/%m/%Y')}**")
     
-    # Diviso in 2 colonne simmetriche
     col_out, col_in = st.columns(2)
-    
     with col_out:
         st.markdown("#### 🚪 PARTENZE / DA PULIRE (Check-out)")
         partenze = [p for p in g.tutte_le_prenotazioni() if p.check_out == oggi]
-        if not partenze:
-            st.success("Nessuna partenza prevista. Nessuna camera da rifare da zero!")
-        for p in partenze:
-            st.error(f"🏠 **{p.stanza.nome}**\n* In uscita: {p.ospite.nome.upper()} {p.ospite.cognome.upper()}\n* **Azione:** Liberare la stanza e procedere con pulizia totale.")
-
+        if not partenze: st.success("Nessuna partenza prevista.")
+        for p in partenze: st.error(f"🏠 **{p.stanza.nome}**\n* In uscita: {p.ospite.nome.upper()} {p.ospite.cognome.upper()}\n* **Azione:** Pulizia totale della struttura.")
     with col_in:
         st.markdown("#### 🔑 IN ARRIVO (Check-in)")
         arrivi = [p for p in g.tutte_le_prenotazioni() if p.check_in == oggi]
-        if not arrivi:
-            st.info("Nessun nuovo arrivo programmato per oggi.")
+        if not arrivi: st.info("Nessun nuovo arrivo programmato.")
         for p in arrivi:
             colaz_text = "🥐 INCLUSA" if p.colazione else "❌ NO colazione"
             st.success(f"🏠 **{p.stanza.nome}**\n* In arrivo: {p.ospite.nome.upper()} {p.ospite.cognome.upper()}\n* Prepara per: **{p.numero_ospiti} Persone**\n* Servizio colazione: **{colaz_text}**")
@@ -348,20 +367,16 @@ elif menu == "Anagrafica Ospiti":
             with col_o2:
                 luogo_n = st.text_input("Luogo di Nascita (Comune o Stato)")
                 data_n_input = st.text_input("Data di Nascita (GG/MM/AAAA)")
-                doc_input = st.text_input("Numero Documento (Carta Identità / Passaporto)")
+                doc_input = st.text_input("Numero Documento")
                 
             if st.form_submit_button("Salva Ospite"):
                 if n and c:
                     g.aggiungi_ospite(n, c, luogo_n if luogo_n else "N.D.", data_n_input if data_n_input else "01/01/1980", sesso_sel, doc_input if doc_input else "N.D.")
-                    st.success(f"Ospite {n.upper()} {c.upper()} registrato con successo!")
+                    st.success(f"Ospite {n.upper()} {c.upper()} registrato!")
                     st.rerun()
-                else: st.error("Nome e Cognome sono obbligatori per il salvataggio.")
+                else: st.error("Nome e Cognome obbligatori.")
     with tab_o2:
-        tabella_ospiti = [{
-            "ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), 
-            "Sesso": o.sesso, "Documento": o.documento,
-            "Luogo Nascita": o.luogo_nascita, "Data Nascita": o.data_nascita
-        } for o in g.ospiti]
+        tabella_ospiti = [{"ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), "Sesso": o.sesso, "Documento": o.documento, "Luogo Nascita": o.luogo_nascita, "Data Nascita": o.data_nascita} for o in g.ospiti]
         st.dataframe(pd.DataFrame(tabella_ospiti), use_container_width=True, hide_index=True)
 
 # --- ELENCO CASE ---

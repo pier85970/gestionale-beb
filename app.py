@@ -11,7 +11,7 @@ st.set_page_config(page_title="Gestionale B&B", layout="wide", initial_sidebar_s
 
 # --- CLASSI CORE ---
 class Ospite:
-    def __init__(self, id_ospite, nome, cognome, luogo_nascita, data_nascita, sesso="M", documento="N.D."):
+    def __init__(self, id_ospite, nome, cognome, luogo_nascita, data_nascita, sesso="M", documento="N.D.", telefono="N.D.", cittadinanza="ITALIANA"):
         self.id = id_ospite
         self.nome = nome
         self.cognome = cognome
@@ -19,6 +19,8 @@ class Ospite:
         self.data_nascita = data_nascita
         self.sesso = sesso          
         self.documento = documento  
+        self.telefono = telefono         
+        self.cittadinanza = cittadinanza 
 
 class Stanza:
     def __init__(self, nome, max_ospiti=4):
@@ -49,7 +51,7 @@ class GestionaleBnb:
         # ⚠️ INSERISCI QUI I TUOI LINK REALI PRIMA DI AVVIARE IL PROGRAMMA ⚠️
         # =========================================================================
         self.URL_ICAL_BOOKING = {
-            "Casa Mariateresa": "https://ical.booking.com/v1/export?t=5bcde36e-d0a7-4d79-b30d-a777dc7378c6", # REALE 
+           "Casa Mariateresa": "https://ical.booking.com/v1/export?t=5bcde36e-d0a7-4d79-b30d-a777dc7378c6", # REALE 
             "Casa Antonetta": "https://ical.booking.com/v1/export?t=b5998ab5-6b80-4574-bbae-91543acbbf08", # REALE
             "Casa Peppino": "https://ical.booking.com/v1/export?t=04546f5f-8e34-4fb7-b94e-3c1e2f274780" # REALE
         }
@@ -71,20 +73,21 @@ class GestionaleBnb:
                     for o in dati:
                         self.ospiti.append(Ospite(
                             o['id'], o['nome'], o['cognome'], o['luogo_nascita'], o['data_nascita'],
-                            o.get('sesso', 'M'), o.get('documento', 'N.D.')
+                            o.get('sesso', 'M'), o.get('documento', 'N.D.'),
+                            o.get('telefono', 'N.D.'), o.get('cittadinanza', 'ITALIANA')
                         ))
             except Exception: pass
                 
         if not self.ospiti:
             storico_ospiti = [
-                (1, "bruno", "balestrieri", "N.D.", "", "M", "N.D."), 
-                (2, "marcela", "halamikova palkova", "N.D.", "", "F", "N.D."),
-                (3, "claudia", "loiodice", "N.D.", "", "F", "N.D."), 
-                (21, "PASQUAE", "MEMOLA", "Terlizzi", "04/11/1973", "M", "AA1234567"), 
-                (22, "ALESSANDRO", "ULGHARAITA", "Torre del Greco", "15/08/1973", "M", "AB9876543")
+                (1, "bruno", "balestrieri", "N.D.", "", "M", "N.D.", "N.D.", "ITALIANA"), 
+                (2, "marcela", "halamikova palkova", "N.D.", "", "F", "N.D.", "N.D.", "ITALIANA"),
+                (3, "claudia", "loiodice", "N.D.", "", "F", "N.D.", "N.D.", "ITALIANA"), 
+                (21, "PASQUAE", "MEMOLA", "Terlizzi", "04/11/1973", "M", "AA1234567", "N.D.", "ITALIANA"), 
+                (22, "ALESSANDRO", "ULGHARAITA", "Torre del Greco", "15/08/1973", "M", "AB9876543", "N.D.", "ITALIANA")
             ]
-            for id_o, n, c, ln, dn, s, doc in storico_ospiti:
-                self.ospiti.append(Ospite(id_o, n, c, ln, dn, s, doc))
+            for id_o, n, c, ln, dn, s, doc, tel, cit in storico_ospiti:
+                self.ospiti.append(Ospite(id_o, n, c, ln, dn, s, doc, tel, cit))
             self._salva_ospiti()
 
         if os.path.exists(self.FILE_LINKS):
@@ -112,7 +115,9 @@ class GestionaleBnb:
         dati = [{
             'id': o.id, 'nome': o.nome, 'cognome': o.cognome, 
             'luogo_nascita': o.luogo_nascita, 'data_nascita': str(o.data_nascita),
-            'sesso': o.sesso, 'documento': o.documento
+            'sesso': o.sesso, 'documento': o.documento,
+            'telefono': o.telefono,
+            'cittadinanza': o.cittadinanza
         } for o in self.ospiti]
         with open(self.FILE_OSPITI, "w", encoding="utf-8") as f:
             json.dump(dati, f, ensure_ascii=False, indent=4)
@@ -139,9 +144,9 @@ class GestionaleBnb:
             json.dump(self.booking_links, f, ensure_ascii=False, indent=4)
         self.sincronizza_booking()
 
-    def aggiungi_ospite(self, nome, cognome, luogo_nascita, data_nascita, sesso, documento):
+    def aggiungi_ospite(self, nome, cognome, luogo_nascita, data_nascita, sesso, documento, telefono, cittadinanza):
         nuovo_id = max([o.id for o in self.ospiti], default=0) + 1
-        nuovo_ospite = Ospite(nuovo_id, nome, cognome, luogo_nascita, data_nascita, sesso, documento)
+        nuovo_ospite = Ospite(nuovo_id, nome, cognome, luogo_nascita, data_nascita, sesso, documento, telefono, cittadinanza)
         self.ospiti.append(nuovo_ospite)
         self._salva_ospiti()
         return nuovo_ospite
@@ -158,7 +163,7 @@ class GestionaleBnb:
     def sincronizza_booking(self):
         self.prenotazioni_booking = []
         self.errori_sincronizzazione = []
-        ospite_fittizio = Ospite(0, "Cliente", "Booking.com", "Online", "2000-01-01", "M", "ONLINE")
+        ospite_fittizio = Ospite(0, "Cliente", "Booking.com", "Online", "2000-01-01", "M", "ONLINE", "N.D.", "ONLINE")
         
         for nome_casa, url in self.URL_ICAL_BOOKING.items():
             if not url or "INSERISCI_QUI" in url: 
@@ -294,7 +299,7 @@ if menu == "Tabellone Disponibilità":
             st.info(f"📅 **Date impostate su Booking.com:** Dal {p_mod.check_in.strftime('%d/%m/%Y')} al {p_mod.check_out.strftime('%d/%m/%Y')}")
             
             if p_mod.ospite.id != 0:
-                st.success(f"Ospite attualmente collegato: **{p_mod.ospite.nome.upper()} {p_mod.ospite.cognome.upper()}**")
+                st.success(f"Ospite currently collegato: **{p_mod.ospite.nome.upper()} {p_mod.ospite.cognome.upper()}**")
                 testo_alloggiati = g.genera_testo_alloggiati(p_mod)
                 st.download_button(
                     label="🚓 Scarica Schedina Questura (Alloggiati Web)",
@@ -444,19 +449,29 @@ elif menu == "Anagrafica Ospiti":
                 n = st.text_input("Nome *")
                 c = st.text_input("Cognome *")
                 sesso_sel = st.selectbox("Sesso", ["M", "F"])
+                tel_input = st.text_input("Numero di Telefono") 
             with col_o2:
                 luogo_n = st.text_input("Luogo di Nascita (Comune o Stato)")
                 data_n_input = st.text_input("Data di Nascita (GG/MM/AAAA)")
                 doc_input = st.text_input("Numero Documento")
+                cit_input = st.text_input("Cittadinanza", value="ITALIANA") 
                 
             if st.form_submit_button("Salva Ospite"):
                 if n and c:
-                    g.aggiungi_ospite(n, c, luogo_n if luogo_n else "N.D.", data_n_input if data_n_input else "01/01/1980", sesso_sel, doc_input if doc_input else "N.D.")
+                    g.aggiungi_ospite(
+                        n, c, 
+                        luogo_n if luogo_n else "N.D.", 
+                        data_n_input if data_n_input else "01/01/1980", 
+                        sesso_sel, 
+                        doc_input if doc_input else "N.D.",
+                        tel_input if tel_input else "N.D.",
+                        cit_input if cit_input else "ITALIANA"
+                    )
                     st.success(f"Ospite {n.upper()} {c.upper()} registrato!")
                     st.rerun()
                 else: st.error("Nome e Cognome obbligatori.")
     with tab_o2:
-        tabella_ospiti = [{"ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), "Sesso": o.sesso, "Documento": o.documento, "Luogo Nascita": o.luogo_nascita, "Data Nascita": o.data_nascita} for o in g.ospiti]
+        tabella_ospiti = [{"ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), "Sesso": o.sesso, "Telefono": o.telefono, "Cittadinanza": o.cittadinanza, "Documento": o.documento, "Luogo Nascita": o.luogo_nascita, "Data Nascita": o.data_nascita} for o in g.ospiti]
         st.dataframe(pd.DataFrame(tabella_ospiti), use_container_width=True, hide_index=True)
 
 # --- ELENCO CASE ---

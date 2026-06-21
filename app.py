@@ -136,13 +136,18 @@ class GestionaleBnb:
     def tutte_le_prenotazioni(self):
         return self.prenotazioni + self.prenotazioni_booking
 
+    # CORREZIONE LOGICA: Adesso esclude correttamente se stessa durante la modifica
     def elenco_case_disponibili(self, check_in, check_out, ignora_p=None):
         case_occupate = set()
         for p in self.prenotazioni:
-            if ignora_p is not None and p == ignora_p: continue
-            if not (check_out <= p.check_in or check_in >= p.check_out): case_occupate.add(p.stanza.nome)
+            if ignora_p is not None and p == ignora_p: 
+                continue
+            # Verifica sovrapposizione date standard
+            if not (check_out <= p.check_in or check_in >= p.check_out): 
+                case_occupate.add(p.stanza.nome)
         for p in self.prenotazioni_booking:
-            if not (check_out <= p.check_in or check_in >= p.check_out): case_occupate.add(p.stanza.nome)
+            if not (check_out <= p.check_in or check_in >= p.check_out): 
+                case_occupate.add(p.stanza.nome)
         return [c for c in self.ELENCO_CASE if c not in case_occupate]
 
 # --- INIZIALIZZAZIONE ---
@@ -165,28 +170,26 @@ if st.sidebar.button("🔄 Forza Sincronizzazione", type="primary"):
     st.sidebar.success("Sincronizzazione completata!")
     st.rerun()
 
-# --- SEZIONE: TABELLONE INTERATTIVO ---
+# --- SEZIONE: TABELLONE ---
 if menu == "Tabellone Disponibilità":
-    st.header("📅 Tabellone Occupazione Case (Clicca su un giorno occupato per modificarlo)")
-    st.caption("Legenda: 🥐 = Colazione Inclusa | 👥 = Ospiti | 🌐 = Blocco Esterno")
+    st.header("📅 Tabellone Occupazione Case")
+    st.caption("Clicca su una cella rossa per modificare rapidamente quella specifica prenotazione.")
     
     col1, col2 = st.columns(2)
     with col1: data_inizio = st.date_input("Data inizio visualizzazione", date.today())
-    with col2: giorni_mostrati = st.slider("Giorni da mostrare", 5, 15, 10) # Ridotto leggermente il range per far entrare bene i bottoni orizzontali
+    with col2: giorni_mostrati = st.slider("Giorni da mostrare nel tabellone", 5, 15, 10)
         
     date_tabella = [data_inizio + timedelta(days=i) for i in range(giorni_mostrati)]
     
-    # Costruzione griglia di bottoni
     for casa in g.ELENCO_CASE:
         st.markdown(f"### 🏠 {casa}")
         col_giorni = st.columns(giorni_mostrati)
         
         for i, d in enumerate(date_tabella):
             with col_giorni[i]:
-                # Etichetta del giorno in alto al bottone
-                st.markdown(f"<p style='text-align: center; margin-bottom: 2px; font-weight: bold;'>{d.strftime('%d/%m')}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='text-align: center; margin-bottom: 2px; font-weight: bold; color:#555;'>{d.strftime('%d/%m')}</p>", unsafe_allow_html=True)
                 
-                # Trova se c'è una prenotazione per questo giorno e questa casa
+                # Identifica se il giorno specifico ricade in qualche prenotazione
                 trovata = None
                 for p in g.tutte_le_prenotazioni():
                     if p.stanza.nome == casa and p.check_in <= d < p.check_out:
@@ -195,46 +198,58 @@ if menu == "Tabellone Disponibilità":
                 
                 if trovata:
                     if trovata.sorgente == "Booking":
-                        st.button("🌐 Booking", key=f"btn_{casa}_{d}", use_container_width=True, disabled=True, help="Bloccato da sincronizzazione esterna")
+                        st.button("🌐 iCal", key=f"btn_{casa}_{d}", use_container_width=True, disabled=True, help="Bloccato da Booking.com")
                     else:
                         col_icon = "🥐" if trovata.colazione else "❌"
                         label = f"🔴 {trovata.ospite.cognome[:7].upper()}\n{trovata.numero_ospiti}👥 {col_icon}"
-                        # Se l'utente clicca, salviamo la prenotazione da modificare nello stato
-                        if st.button(label, key=f"btn_{casa}_{d}", use_container_width=True, help=f"Clicca per modificare la prenotazione di {trovata.ospite.nome} {trovata.ospite.cognome}"):
+                        
+                        # Al click, passiamo l'oggetto esatto alla sessione per evitare bug di indice
+                        if st.button(label, key=f"btn_{casa}_{d}", use_container_width=True):
                             st.session_state.p_da_modificare = trovata
+                            st.rerun()
                 else:
                     st.button("🟢 Libera", key=f"btn_{casa}_{d}", use_container_width=True, disabled=True)
         st.markdown("---")
 
-    # PANNELLO DI MODIFICA RAPIDA (Appare solo se hai fatto click su una prenotazione occupata)
+    # PANNELLO RAPIDO SOTTO IL TABELLONE
     if st.session_state.p_da_modificare:
         p_mod = st.session_state.p_da_modificare
-        st.info(f"⚙️ **Modifica Rapida attiva per**: {p_mod.ospite.nome.upper()} {p_mod.ospite.cognome.upper()} presso **{p_mod.stanza.nome}**")
         
-        with st.expander("Modifica i dettagli o Elimina", expanded=True):
-            col_in1, col_in2, col_in3, col_in4 = st.columns(4)
-            with col_in1:
-                nuovo_cin = st.date_input("Modifica Check-in", p_mod.check_in, key="quick_cin")
-            with col_in2:
-                nuovo_cout = st.date_input("Modifica Check-out", p_mod.check_out, key="quick_cout")
-            with col_in3:
-                nuovo_pax = st.number_input("Ospiti (Max 4)", min_value=1, max_value=4, value=int(p_mod.numero_ospiti), key="quick_pax")
-            with col_in4:
-                st.write("") # Spaziatore spaziale
-                nuova_colaz = st.checkbox("🥐 Colazione Inclusa", value=bool(p_mod.colazione), key="quick_colaz")
+        # Doppia sicurezza: verifichiamo che la prenotazione esista ancora nel sistema locale
+        if p_mod in g.prenotazioni:
+            st.markdown(f"## ⚙️ Modifica Prenotazione: {p_mod.ospite.nome.upper()} {p_mod.ospite.cognome.upper()}")
             
-            # Cambio Struttura
-            case_libere = g.elenco_case_disponibili(nuovo_cin, nuovo_cout, ignora_p=p_mod)
-            if p_mod.stanza.nome not in case_libere:
-                case_libere.append(p_mod.stanza.nome)
-            case_libere.sort()
-            nuova_casa = st.selectbox("Sposta in un'altra casa", case_libere, index=case_libere.index(p_mod.stanza.nome), key="quick_casa")
-            
-            c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 2])
-            with c_btn1:
-                if st.button("💾 Salva Modifiche", type="primary", use_container_width=True):
+            with st.form("form_modifica_rapida"):
+                col_in1, col_in2, col_in3, col_in4 = st.columns(4)
+                with col_in1:
+                    nuovo_cin = st.date_input("Check-in", p_mod.check_in)
+                with col_in2:
+                    nuovo_cout = st.date_input("Check-out", p_mod.check_out)
+                with col_in3:
+                    nuovo_pax = st.number_input("Ospiti (Max 4)", min_value=1, max_value=4, value=int(p_mod.numero_ospiti))
+                with col_in4:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    nuova_colaz = st.checkbox("🥐 Colazione Inclusa", value=bool(p_mod.colazione))
+                
+                # Calcola le case libere escludendo lo stato attuale di questa prenotazione per non generare falsi blocchi
+                case_libere = g.elenco_case_disponibili(nuovo_cin, nuovo_cout, ignora_p=p_mod)
+                if p_mod.stanza.nome not in case_libere:
+                    case_libere.append(p_mod.stanza.nome)
+                case_libere.sort()
+                
+                nuova_casa = st.selectbox("Sposta Struttura", case_libere, index=case_libere.index(p_mod.stanza.nome))
+                
+                c_btn1, c_btn2, c_btn3 = st.columns(3)
+                with c_btn1:
+                    submit_save = st.form_submit_button("💾 Salva Modifiche", type="primary")
+                with c_btn2:
+                    submit_del = st.form_submit_button("❌ Elimina Prenotazione")
+                with c_btn3:
+                    submit_cancel = st.form_submit_button("Annulla")
+                
+                if submit_save:
                     if nuovo_cin >= nuovo_cout:
-                        st.error("Il check-out deve essere successivo al check-in.")
+                        st.error("Errore: Il check-out deve essere successivo al check-in.")
                     else:
                         p_mod.check_in = nuovo_cin
                         p_mod.check_out = nuovo_cout
@@ -242,46 +257,52 @@ if menu == "Tabellone Disponibilità":
                         p_mod.colazione = nuova_colaz
                         p_mod.stanza = next(s for s in g.stanze if s.nome == nuova_casa)
                         g._salva_prenotazioni()
-                        st.success("Prenotazione aggiornata!")
                         st.session_state.p_da_modificare = None
+                        st.toast("Modifiche salvate con successo!")
                         st.rerun()
-            with c_btn2:
-                if st.button("❌ Elimina Prenotazione", type="secondary", use_container_width=True):
+                        
+                elif submit_del:
                     g.elimina_prenotazione_obj(p_mod)
-                    st.warning("Prenotazione rimossa!")
+                    st.session_state.p_da_modificare = None
+                    st.toast("Prenotazione eliminata.")
+                    st.rerun()
+                    
+                elif submit_cancel:
                     st.session_state.p_da_modificare = None
                     st.rerun()
-            with c_btn3:
-                if st.button("Chiudi senza salvare", use_container_width=True):
-                    st.session_state.p_da_modificare = None
-                    st.rerun()
-
-# --- SEZIONE: GESTIONE PRENOTAZIONI MANUALE STANDARD ---
-elif menu == "Gestione Prenotazioni":
-    st.header("📝 Gestione delle Prenotazioni Locali")
-    opzioni_ospiti = {f"{o.nome} {o.cognome} (ID: {o.id})": o for o in g.ospiti}
-    ospite_scelto = st.selectbox("Seleziona Ospite", list(opzioni_ospiti.keys()))
-    
-    c1, c2 = st.columns(2)
-    with c1: data_in = st.date_input("Data di Check-in", date.today())
-    with c2: data_out = st.date_input("Data di Check-out", date.today() + timedelta(days=1))
-    
-    c3, c4 = st.columns(2)
-    with c3: num_persone = st.number_input("Numero di persone (Max 4)", min_value=1, max_value=4, value=2)
-    with c4: servizio_colazione = st.checkbox("🥐 Include Colazione?", value=False)
-        
-    if data_in >= data_out: 
-        st.error("Il check-out deve essere successivo al check-in!")
-    else:
-        case_disponibili = g.elenco_case_disponibili(data_in, data_out)
-        if not case_disponibili: st.error("Nessuna casa disponibile nelle date selezionate.")
         else:
-            casa_assegnata = st.selectbox("Seleziona la struttura libera", case_disponibili)
-            if st.button("Salva Prenotazione Manuale"):
-                stanza_obj = next(s for s in g.stanze if s.nome == casa_assegnata)
-                g.aggiungi_prenotazione(opzioni_ospiti[ospite_scelto], stanza_obj, data_in, data_out, num_persone, servizio_colazione)
-                st.success("Prenotazione salvata con successo!")
-                st.rerun()
+            st.session_state.p_da_modificare = None
+
+# --- SEZIONE: NUOVA PRENOTAZIONE MANUALE ---
+elif menu == "Gestione Prenotazioni":
+    st.header("📝 Nuova Prenotazione Manuale")
+    if not g.ospiti:
+        st.warning("Registra prima un ospite nell'Anagrafica!")
+    else:
+        opzioni_ospiti = {f"{o.nome.upper()} {o.cognome.upper()} (ID: {o.id})": o for o in g.ospiti}
+        ospite_scelto = st.selectbox("Seleziona l'Ospite", list(opzioni_ospiti.keys()))
+        
+        c1, c2 = st.columns(2)
+        with c1: data_in = st.date_input("Data Check-in", date.today())
+        with c2: data_out = st.date_input("Data Check-out", date.today() + timedelta(days=1))
+        
+        c3, c4 = st.columns(2)
+        with c3: num_persone = st.number_input("Numero di persone (Max 4)", min_value=1, max_value=4, value=2)
+        with c4: servicio_colazione = st.checkbox("🥐 Include Colazione?", value=False)
+            
+        if data_in >= data_out: 
+            st.error("Il check-out deve essere successivo al check-in!")
+        else:
+            case_disponibili = g.elenco_case_disponibili(data_in, data_out)
+            if not case_disponibili: 
+                st.error("Nessuna struttura disponibile in queste date.")
+            else:
+                casa_assegnata = st.selectbox("Seleziona la casa da assegnare", case_disponibili)
+                if st.button("Conferma e Salva Prenotazione", type="primary"):
+                    stanza_obj = next(s for s in g.stanze if s.nome == casa_assegnata)
+                    g.aggiungi_prenotazione(opzioni_ospiti[ospite_scelto], stanza_obj, data_in, data_out, num_persone, servicio_colazione)
+                    st.success("Prenotazione registrata!")
+                    st.rerun()
 
 # --- ANAGRAFICA OSPITI ---
 elif menu == "Anagrafica Ospiti":
@@ -298,7 +319,7 @@ elif menu == "Anagrafica Ospiti":
                     st.rerun()
                 else: st.error("Nome e Cognome obbligatori.")
     with tab_o2:
-        tabella_ospiti = [{"ID": o.id, "Cognome": o.cognome, "Nome": o.nome, "Luogo di Nascita": o.luogo_nascita, "Data di Nascita / Info": o.data_nascita} for o in g.ospiti]
+        tabella_ospiti = [{"ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), "Luogo di Nascita": o.luogo_nascita, "Data di Nascita / Info": o.data_nascita} for o in g.ospiti]
         st.dataframe(pd.DataFrame(tabella_ospiti), use_container_width=True, hide_index=True)
 
 # --- ELENCO CASE ---

@@ -11,12 +11,14 @@ st.set_page_config(page_title="Gestionale B&B", layout="wide", initial_sidebar_s
 
 # --- CLASSI CORE ---
 class Ospite:
-    def __init__(self, id_ospite, nome, cognome, luogo_nascita, data_nascita):
+    def __init__(self, id_ospite, nome, cognome, luogo_nascita, data_nascita, sesso="M", documento="N.D."):
         self.id = id_ospite
         self.nome = nome
         self.cognome = cognome
         self.luogo_nascita = luogo_nascita
         self.data_nascita = data_nascita
+        self.sesso = sesso          
+        self.documento = documento  
 
 class Stanza:
     def __init__(self, nome, max_ospiti=4):
@@ -42,9 +44,9 @@ class GestionaleBnb:
         self.stanze = [Stanza(c, max_ospiti=4) for c in self.ELENCO_CASE]
         
         self.URL_ICAL_BOOKING = {
-            "Casa Mariateresa": "https://ical.booking.com/v1/export?t=24718224-141d-457d-b1a2-af2c02a20437",
-            "Casa Antonetta": "https://ical.booking.com/v1/export?t=ba598bbd-83a4-4f1a-98e5-e542b9d6d122",
-            "Casa Peppino": "https://ical.booking.com/v1/export?t=e3c2b56b-3416-440a-9fdf-4947fe8f760d"
+            "Casa Mariateresa": "https://ical.booking.com/v1/export?t=INSERISCI_QUI_IL_LINK_MARIATERESA", 
+            "Casa Antonetta": "https://ical.booking.com/v1/export?t=b5998ab5-6b80-4574-bbae-91543acbbf08",
+            "Casa Peppino": "https://ical.booking.com/v1/export?t=INSERISCI_QUI_IL_LINK_PEPPINO"
         }
         
         self.ospiti = []
@@ -59,17 +61,22 @@ class GestionaleBnb:
                 with open(self.FILE_OSPITI, "r", encoding="utf-8") as f:
                     dati = json.load(f)
                     for o in dati:
-                        self.ospiti.append(Ospite(o['id'], o['nome'], o['cognome'], o['luogo_nascita'], o['data_nascita']))
+                        self.ospiti.append(Ospite(
+                            o['id'], o['nome'], o['cognome'], o['luogo_nascita'], o['data_nascita'],
+                            o.get('sesso', 'M'), o.get('documento', 'N.D.')
+                        ))
             except Exception: pass
                 
         if not self.ospiti:
             storico_ospiti = [
-                (1, "bruno", "balestrieri", "N.D.", ""), (2, "marcela", "halamikova palkova", "N.D.", ""),
-                (3, "claudia", "loiodice", "N.D.", ""), (21, "PASQUAE", "MEMOLA", "Terlizzi", "04/11/1973"), 
-                (22, "ALESSANDRO", "ULGHARAITA", "Torre del Greco", "15/08/1973")
+                (1, "bruno", "balestrieri", "N.D.", "", "M", "N.D."), 
+                (2, "marcela", "halamikova palkova", "N.D.", "", "F", "N.D."),
+                (3, "claudia", "loiodice", "N.D.", "", "F", "N.D."), 
+                (21, "PASQUAE", "MEMOLA", "Terlizzi", "04/11/1973", "M", "AA1234567"), 
+                (22, "ALESSANDRO", "ULGHARAITA", "Torre del Greco", "15/08/1973", "M", "AB9876543")
             ]
-            for id_o, n, c, ln, dn in storico_ospiti:
-                self.ospiti.append(Ospite(id_o, n, c, ln, dn))
+            for id_o, n, c, ln, dn, s, doc in storico_ospiti:
+                self.ospiti.append(Ospite(id_o, n, c, ln, dn, s, doc))
             self._salva_ospiti()
 
         if os.path.exists(self.FILE_PRENOTAZIONI):
@@ -88,7 +95,11 @@ class GestionaleBnb:
             except Exception: pass
 
     def _salva_ospiti(self):
-        dati = [{'id': o.id, 'nome': o.nome, 'cognome': o.cognome, 'luogo_nascita': o.luogo_nascita, 'data_nascita': str(o.data_nascita)} for o in self.ospiti]
+        dati = [{
+            'id': o.id, 'nome': o.nome, 'cognome': o.cognome, 
+            'luogo_nascita': o.luogo_nascita, 'data_nascita': str(o.data_nascita),
+            'sesso': o.sesso, 'documento': o.documento
+        } for o in self.ospiti]
         with open(self.FILE_OSPITI, "w", encoding="utf-8") as f:
             json.dump(dati, f, ensure_ascii=False, indent=4)
 
@@ -104,6 +115,13 @@ class GestionaleBnb:
         with open(self.FILE_PRENOTAZIONI, "w", encoding="utf-8") as f:
             json.dump(dati, f, ensure_ascii=False, indent=4)
 
+    def aggiungi_ospite(self, nome, cognome, luogo_nascita, data_nascita, sesso, documento):
+        nuovo_id = max([o.id for o in self.ospiti], default=0) + 1
+        nuovo_ospite = Ospite(nuovo_id, nome, cognome, luogo_nascita, data_nascita, sesso, documento)
+        self.ospiti.append(nuovo_ospite)
+        self._salva_ospiti()
+        return nuovo_ospite
+
     def aggiungi_prenotazione(self, ospite, stanza, check_in, check_out, numero_ospiti, colazione):
         self.prenotazioni.append(Prenotazione(ospite, stanza, check_in, check_out, numero_ospiti, colazione, "Manuale"))
         self._salva_prenotazioni()
@@ -113,39 +131,26 @@ class GestionaleBnb:
             self.prenotazioni.remove(prenotazione_obj)
             self._salva_prenotazioni()
 
-    # --- FUNZIONE ICAL AGGIORNATA PER MANTENERE IL PASSATO ---
     def sincronizza_booking(self):
         self.prenotazioni_booking = []
-        ospite_fittizio = Ospite(0, "Cliente", "Booking.com", "Online", "2000-01-01")
-        
+        ospite_fittizio = Ospite(0, "Cliente", "Booking.com", "Online", "2000-01-01", "M", "ONLINE")
         for nome_casa, url in self.URL_ICAL_BOOKING.items():
-            if not url or "INSERISCI_QUI" in url: 
-                continue
+            if not url or "INSERISCI_QUI" in url: continue
             try:
                 risposta = requests.get(url, timeout=10)
                 if risposta.status_code == 200:
                     cal = Calendar.from_ical(risposta.text)
                     stanza_sel = next((s for s in self.stanze if s.nome == nome_casa), None)
-                    
                     if stanza_sel:
                         for componente in cal.walk():
                             if componente.name == "VEVENT":
                                 cin_dt = componente.get('dtstart').dt
                                 cout_dt = componente.get('dtend').dt
-                                
-                                # Conversione pulita senza slittamenti orari
                                 cin = cin_dt.date() if isinstance(cin_dt, datetime) else cin_dt
                                 cout = cout_dt.date() if isinstance(cout_dt, datetime) else cout_dt
-                                
-                                if not cin or not cout:
-                                    continue
-                                
-                                # NOTA: Rimosso il filtro temporale. Ora carica TUTTO lo storico presente nel file .ics
-                                self.prenotazioni_booking.append(
-                                    Prenotazione(ospite_fittizio, stanza_sel, cin, cout, 2, False, "Booking")
-                                )
-            except Exception as e:
-                print(f"Errore iCal per {nome_casa}: {e}")
+                                if not cin or not cout: continue
+                                self.prenotazioni_booking.append(Prenotazione(ospite_fittizio, stanza_sel, cin, cout, 2, False, "Booking"))
+            except Exception: pass
 
     def tutte_le_prenotazioni(self):
         return self.prenotazioni + self.prenotazioni_booking
@@ -153,14 +158,25 @@ class GestionaleBnb:
     def elenco_case_disponibili(self, check_in, check_out, ignora_p=None):
         case_occupate = set()
         for p in self.prenotazioni:
-            if ignora_p is not None and p == ignora_p: 
-                continue
-            if not (check_out <= p.check_in or check_in >= p.check_out): 
-                case_occupate.add(p.stanza.nome)
+            if ignora_p is not None and p == ignora_p: continue
+            if not (check_out <= p.check_in or check_in >= p.check_out): case_occupate.add(p.stanza.nome)
         for p in self.prenotazioni_booking:
-            if not (check_out <= p.check_in or check_in >= p.check_out): 
-                case_occupate.add(p.stanza.nome)
+            if not (check_out <= p.check_in or check_in >= p.check_out): case_occupate.add(p.stanza.nome)
         return [c for c in self.ELENCO_CASE if c not in case_occupate]
+
+    def genera_testo_alloggiati(self, p):
+        o = p.ospite
+        tipo_alloggiato = "17" 
+        data_arrivo = p.check_in.strftime("%d/%m/%Y")
+        giorni_permanenza = f"{(p.check_out - p.check_in).days:02d}"
+        cognome = o.cognome.upper().ljust(50)[:50]
+        nome = o.nome.upper().ljust(30)[:30]
+        sesso = o.sesso.upper()
+        data_nascita = o.data_nascita if "/" in o.data_nascita else "01/01/1980"
+        comune_nascita = o.luogo_nascita.upper().ljust(9)[:9] 
+        
+        riga = f"{tipo_alloggiato}{data_arrivo}{giorni_permanenza}{cognome}{nome}{sesso}{data_nascita}{comune_nascita}"
+        return riga
 
 # --- INIZIALIZZAZIONE ---
 if 'g' not in st.session_state:
@@ -173,61 +189,60 @@ g = st.session_state.g
 
 # --- INTERFACCIA UTENTE ---
 st.sidebar.title("🏨 Menu Gestionale")
-menu = st.sidebar.radio("Vai a:", ["Tabellone Disponibilità", "Gestione Prenotazioni", "Anagrafica Ospiti", "Elenco Case"])
+menu = st.sidebar.radio("Vai a:", ["Tabellone Disponibilità", "🧹 Pulizie & Dashboard Giornaliera", "Gestione Prenotazioni", "Anagrafica Ospiti", "Elenco Case"])
 
 st.sidebar.markdown("---")
-if st.sidebar.button("🔄 Forza Sincronizzazione Booking", type="primary"):
-    with st.spinner("Sincronizzazione di tutto lo storico Booking..."):
-        g.sincronizza_booking()
-    st.sidebar.success("Sincronizzazione completata!")
+if st.sidebar.button("🔄 Sincronizza Booking", type="primary"):
+    with st.spinner("Allineamento calendari..."): g.sincronizza_booking()
+    st.sidebar.success("Sincronizzato!")
     st.rerun()
 
-# --- SEZIONE: TABELLONE ---
+# --- SEZIONE 1: TABELLONE INTERATTIVO ---
 if menu == "Tabellone Disponibilità":
     st.header("📅 Tabellone Occupazione Case")
-    st.caption("Per guardare il **passato**, sposta indietro la data di inizio visualizzazione nel selettore qui sotto.")
-    
+    st.caption("Clicca su un blocco rosso (prenotazione manuale) per modificarla al volo.")
     col1, col2 = st.columns(2)
-    with col1: 
-        # Modifica la data di inizio a piacimento (anche mesi passati) per vedere il vecchio storico
-        data_inizio = st.date_input("Data inizio visualizzazione", date.today())
-    with col2: 
-        giorni_mostrati = st.slider("Giorni da mostrare nel tabellone", 5, 15, 10)
-        
+    with col1: data_inizio = st.date_input("Data inizio visualizzazione", date.today())
+    with col2: giorni_mostrati = st.slider("Giorni da mostrare", 5, 15, 10)
     date_tabella = [data_inizio + timedelta(days=i) for i in range(giorni_mostrati)]
     
     for casa in g.ELENCO_CASE:
         st.markdown(f"### 🏠 {casa}")
         col_giorni = st.columns(giorni_mostrati)
-        
         for i, d in enumerate(date_tabella):
             with col_giorni[i]:
                 st.markdown(f"<p style='text-align: center; margin-bottom: 2px; font-weight: bold; color:#555;'>{d.strftime('%d/%m')}</p>", unsafe_allow_html=True)
-                
                 trovata = None
                 for p in g.tutte_le_prenotazioni():
                     if p.stanza.nome == casa and p.check_in <= d < p.check_out:
                         trovata = p
                         break
-                
                 if trovata:
                     if trovata.sorgente == "Booking":
-                        st.button("🌐 Booking", key=f"btn_{casa}_{d}", use_container_width=True, help=f"Booking.com: {trovata.check_in} -> {trovata.check_out}")
+                        st.button("🌐 Booking", key=f"btn_{casa}_{d}", use_container_width=True)
                     else:
                         col_icon = "🥐" if trovata.colazione else "❌"
                         label = f"🔴 {trovata.ospite.cognome[:7].upper()}\n{trovata.numero_ospiti}👥 {col_icon}"
                         if st.button(label, key=f"btn_{casa}_{d}", use_container_width=True):
                             st.session_state.p_da_modificare = trovata
                             st.rerun()
-                else:
-                    st.button("🟢 Libera", key=f"btn_{casa}_{d}", use_container_width=True, disabled=True)
+                else: st.button("🟢 Libera", key=f"btn_{casa}_{d}", use_container_width=True, disabled=True)
         st.markdown("---")
 
-    # PANNELLO RAPIDO SOTTO IL TABELLONE (Per modifiche locali)
+    # Pannello di Modifica Rapida
     if st.session_state.p_da_modificare:
         p_mod = st.session_state.p_da_modificare
         if p_mod in g.prenotazioni:
-            st.markdown(f"## ⚙️ Modifica Prenotazione: {p_mod.ospite.nome.upper()} {p_mod.ospite.cognome.upper()}")
+            st.markdown(f"## ⚙️ Modifica o Esporta: {p_mod.ospite.nome.upper()} {p_mod.ospite.cognome.upper()}")
+            
+            testo_alloggiati = g.genera_testo_alloggiati(p_mod)
+            st.download_button(
+                label="🚓 Scarica File per Alloggiati Web (Polizia)",
+                data=testo_alloggiati,
+                file_name=f"alloggiati_{p_mod.ospite.cognome}_{p_mod.check_in}.txt",
+                mime="text/plain",
+                help="Scarica il file .txt pronto da caricare sul portale della Polizia di Stato."
+            )
             
             with st.form("form_modifica_rapida"):
                 col_in1, col_in2, col_in3, col_in4 = st.columns(4)
@@ -266,6 +281,33 @@ if menu == "Tabellone Disponibilità":
                     st.rerun()
         else: st.session_state.p_da_modificare = None
 
+# --- SEZIONE MODIFICATA: PULIZIE CON 2 COLONNE ---
+elif menu == "🧹 Pulizie & Dashboard Giornaliera":
+    st.header("🧹 Piano di Lavoro Giornaliero")
+    oggi = st.date_input("Seleziona Giorno di lavoro", date.today())
+    
+    st.markdown(f"### Elenco attività operative per il giorno: **{oggi.strftime('%d/%m/%Y')}**")
+    
+    # Diviso in 2 colonne simmetriche
+    col_out, col_in = st.columns(2)
+    
+    with col_out:
+        st.markdown("#### 🚪 PARTENZE / DA PULIRE (Check-out)")
+        partenze = [p for p in g.tutte_le_prenotazioni() if p.check_out == oggi]
+        if not partenze:
+            st.success("Nessuna partenza prevista. Nessuna camera da rifare da zero!")
+        for p in partenze:
+            st.error(f"🏠 **{p.stanza.nome}**\n* In uscita: {p.ospite.nome.upper()} {p.ospite.cognome.upper()}\n* **Azione:** Liberare la stanza e procedere con pulizia totale.")
+
+    with col_in:
+        st.markdown("#### 🔑 IN ARRIVO (Check-in)")
+        arrivi = [p for p in g.tutte_le_prenotazioni() if p.check_in == oggi]
+        if not arrivi:
+            st.info("Nessun nuovo arrivo programmato per oggi.")
+        for p in arrivi:
+            colaz_text = "🥐 INCLUSA" if p.colazione else "❌ NO colazione"
+            st.success(f"🏠 **{p.stanza.nome}**\n* In arrivo: {p.ospite.nome.upper()} {p.ospite.cognome.upper()}\n* Prepara per: **{p.numero_ospiti} Persone**\n* Servizio colazione: **{colaz_text}**")
+
 # --- SEZIONE: NUOVA PRENOTAZIONE MANUALE ---
 elif menu == "Gestione Prenotazioni":
     st.header("📝 Nuova Prenotazione Manuale")
@@ -298,16 +340,28 @@ elif menu == "Anagrafica Ospiti":
     tab_o1, tab_o2 = st.tabs(["➕ Registra Nuovo Ospite", "📋 Elenco Clienti Salvati"])
     with tab_o1:
         with st.form("form_ospite"):
-            n, c, luogo_n = st.text_input("Nome"), st.text_input("Cognome"), st.text_input("Luogo di Nascita")
-            data_n_input = st.text_input("Data di Nascita o Info")
+            col_o1, col_o2 = st.columns(2)
+            with col_o1:
+                n = st.text_input("Nome *")
+                c = st.text_input("Cognome *")
+                sesso_sel = st.selectbox("Sesso", ["M", "F"])
+            with col_o2:
+                luogo_n = st.text_input("Luogo di Nascita (Comune o Stato)")
+                data_n_input = st.text_input("Data di Nascita (GG/MM/AAAA)")
+                doc_input = st.text_input("Numero Documento (Carta Identità / Passaporto)")
+                
             if st.form_submit_button("Salva Ospite"):
                 if n and c:
-                    g.aggiungi_ospite(n, c, luogo_n if luogo_n else "N.D.", data_n_input if data_n_input else "N.D.")
-                    st.success(f"Ospite {n} {c} registrato!")
+                    g.aggiungi_ospite(n, c, luogo_n if luogo_n else "N.D.", data_n_input if data_n_input else "01/01/1980", sesso_sel, doc_input if doc_input else "N.D.")
+                    st.success(f"Ospite {n.upper()} {c.upper()} registrato con successo!")
                     st.rerun()
-                else: st.error("Nome e Cognome obbligatori.")
+                else: st.error("Nome e Cognome sono obbligatori per il salvataggio.")
     with tab_o2:
-        tabella_ospiti = [{"ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), "Luogo di Nascita": o.luogo_nascita, "Data di Nascita / Info": o.data_nascita} for o in g.ospiti]
+        tabella_ospiti = [{
+            "ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), 
+            "Sesso": o.sesso, "Documento": o.documento,
+            "Luogo Nascita": o.luogo_nascita, "Data Nascita": o.data_nascita
+        } for o in g.ospiti]
         st.dataframe(pd.DataFrame(tabella_ospiti), use_container_width=True, hide_index=True)
 
 # --- ELENCO CASE ---

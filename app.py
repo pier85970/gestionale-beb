@@ -150,7 +150,7 @@ class GestionaleBnb:
         self.prenotazioni.append(Prenotazione(ospite, stanza, check_in, check_out, numero_ospiti, colazione, "Manuale"))
         self._salva_prenotazioni()
 
-    def接入_elimina_prenotazione_obj(self, prenotazione_obj):
+    def elimina_prenotazione_obj(self, prenotazione_obj):
         if prenotazione_obj in self.prenotazioni:
             self.prenotazioni.remove(prenotazione_obj)
             self._salva_prenotazioni()

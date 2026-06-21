@@ -38,11 +38,11 @@ class GestionaleBnb:
         self.ELENCO_CASE = ["Casa Mariateresa", "Casa Antonetta", "Casa Peppino"]
         self.stanze = [Stanza(c) for c in self.ELENCO_CASE]
         
-        # LINK ICAL DI BOOKING.COM
+        # LINK ICAL DI BOOKING.COM (Assicurati di inserire i link reali completi!)
         self.URL_ICAL_BOOKING = {
-            "Casa Mariateresa": "https://ical.booking.com/v1/export?t=INSERISCI_QUI_IL_LINK_MARIATERESA",
-            "Casa Antonetta": "https://ical.booking.com/v1/export?t=b5998ab5-6b80-4574-bbae-91543acbbf08",
-            "Casa Peppino": "https://ical.booking.com/v1/export?t=INSERISCI_QUI_IL_LINK_PEPPINO"
+            "Casa Mariateresa": "https://ical.booking.com/v1/export?t=689502a9-31d5-49fb-bd9c-957a025a0d7a",
+            "Casa Antonetta": "https://ical.booking.com/v1/export?t=45ea0953-e271-4120-b36b-62882e1e1f12",
+            "Casa Peppino": "https://ical.booking.com/v1/export?t=6bbe16be-276d-41bd-89cd-aaad238d0d65"
         }
         
         self.ospiti = []
@@ -62,7 +62,7 @@ class GestionaleBnb:
             except Exception:
                 pass
                 
-        if not self.ospiti: # Database di ripiego con i tuoi dati reali
+        if not self.ospiti:
             storico_ospiti = [
                 (1, "bruno", "balestrieri", "N.D.", ""), (2, "marcela", "halamikova palkova", "N.D.", ""),
                 (3, "claudia", "loiodice", "N.D.", ""), (4, "ALESSANDRA", "GHERSI", "N.D.", ""),
@@ -95,7 +95,7 @@ class GestionaleBnb:
             except Exception:
                 pass
                 
-        if not self.prenotazioni: # Mappatura automatica delle tue prenotazioni sulle 3 macro-case
+        if not self.prenotazioni:
             storico_prenotazioni = [
                 (14, "Casa Mariateresa", "2026-05-22", "2026-05-25"), (15, "Casa Mariateresa", "2026-08-28", "2026-08-30"),
                 (15, "Casa Peppino", "2026-08-28", "2026-08-30"), (16, "Casa Antonetta", "2026-08-28", "2026-08-30"),
@@ -144,6 +144,7 @@ class GestionaleBnb:
         
         for nome_casa, url in self.URL_ICAL_BOOKING.items():
             if not url or "INSERISCI_QUI" in url:
+                st.sidebar.warning(f"⚠️ Link iCal mancante per {nome_casa}")
                 continue
             try:
                 risposta = requests.get(url, timeout=10)
@@ -158,8 +159,10 @@ class GestionaleBnb:
                                 cin = cin_dt.date() if isinstance(cin_dt, datetime) else cin_dt
                                 cout = cout_dt.date() if isinstance(cout_dt, datetime) else cout_dt
                                 self.prenotazioni_booking.append(Prenotazione(ospite_fittizio, stanza_sel, cin, cout, "Booking"))
+                else:
+                    st.sidebar.error(f"❌ Errore HTTP {risposta.status_code} per {nome_casa}")
             except Exception as e:
-                st.sidebar.error(f"Errore {nome_casa}: {e}")
+                st.sidebar.error(f"❌ Errore connessione {nome_casa}: {e}")
 
     def tutte_le_prenotazioni(self):
         return self.prenotazioni + self.prenotazioni_booking
@@ -173,9 +176,13 @@ class GestionaleBnb:
             if not (check_out <= p.check_in or check_in >= p.check_out): case_occupate.add(p.stanza.nome)
         return [c for c in self.ELENCO_CASE if c not in case_occupate]
 
-# --- INIZIALIZZAZIONE ---
+# --- INIZIALIZZAZIONE STATO ---
 if 'g' not in st.session_state:
     st.session_state.g = GestionaleBnb()
+    # Eseguiamo una sincronizzazione automatica solo al primo avvio assoluto dell'app
+    st.session_state.g.sincronizza_booking()
+    st.session_state.sincronizzato = True
+
 g = st.session_state.g
 
 # --- INTERFACCIA UTENTE ---
@@ -183,10 +190,11 @@ st.sidebar.title("🏨 Menu Gestionale")
 menu = st.sidebar.radio("Vai a:", ["Tabellone Disponibilità", "Gestione Prenotazioni", "Anagrafica Ospiti", "Elenco Case"])
 
 st.sidebar.markdown("---")
-if st.sidebar.button("🔄 Sincronizza Canali Esterni", type="primary"):
-    with st.spinner("Scaricamento calendari..."):
+if st.sidebar.button("🔄 Forza Sincronizzazione", type="primary"):
+    with st.spinner("Scaricamento calendari in corso..."):
         g.sincronizza_booking()
     st.sidebar.success("Sincronizzazione completata!")
+    st.rerun() # Forza il rinfresco immediato del tabellone grafico
 
 # --- SEZIONE: TABELLONE ---
 if menu == "Tabellone Disponibilità":
@@ -287,4 +295,10 @@ elif menu == "Anagrafica Ospiti":
 elif menu == "Elenco Case":
     st.header("🏠 Elenco delle strutture gestite")
     st.success("Sincronizzazione iCal attiva con i canali ufficiali di Booking.com.")
-    st.table(pd.DataFrame([{"Casa": k, "Stato Collegamento": "🟢 Connesso"} for k in g.URL_ICAL_BOOKING.keys()]))
+    
+    status_case = []
+    for k, url in g.URL_ICAL_BOOKING.items():
+        stato = "🟢 Connesso" if "INSERISCI_QUI" not in url else "🔴 Link Mancante"
+        status_case.append({"Casa": k, "Stato Collegamento": stato})
+        
+    st.table(pd.DataFrame(status_case))

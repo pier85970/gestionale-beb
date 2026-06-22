@@ -152,14 +152,18 @@ class GestionaleBnb:
         self._salva_ospiti()
         return nuovo_ospite
 
+    def elimina_ospite_obj(self, ospite_obj):
+        if ospite_obj in self.ospiti:
+            self.ospiti.remove(ospite_obj)
+            self._salva_ospiti()
+            
+            # Pulisce eventuali prenotazioni manuali rimaste orfane
+            self.prenotazioni = [p for p in self.prenotazioni if p.ospite.id != ospite_obj.id]
+            self._salva_prenotazioni()
+
     def aggiungi_prenotazione(self, ospite, stanza, check_in, check_out, numero_ospiti, colazione):
         self.prenotazioni.append(Prenotazione(ospite, stanza, check_in, check_out, numero_ospiti, colazione, "Manuale"))
         self._salva_prenotazioni()
-
-    def Blacklist_prenotazione_obj(self, prenotazione_obj):
-        if prenotazione_obj in self.prenotazioni:
-            self.prenotazioni.remove(prenotazione_obj)
-            self._salva_prenotazioni()
 
     def elimina_prenotazione_obj(self, prenotazione_obj):
         if prenotazione_obj in self.prenotazioni:
@@ -237,7 +241,7 @@ class GestionaleBnb:
         riga = f"{tipo_alloggiato}{data_arrivo}{giorni_permanenza}{cognome}{nome}{sesso}{data_nascita}{comune_nascita}"
         return riga
 
-# --- FUNZIONE GENERAZIONE LINK WHATSAPP (PASSAGGIO 1) ---
+# --- FUNZIONE GENERAZIONE LINK WHATSAPP ---
 def genera_link_whatsapp(p):
     nome_ospite = f"{p.ospite.nome.capitalize()}"
     messaggio = (
@@ -269,6 +273,8 @@ if 'g' not in st.session_state:
     st.session_state.g.sincronizza_booking()
 if 'p_da_modificare' not in st.session_state:
     st.session_state.p_da_modificare = None
+if 'o_da_modificare' not in st.session_state:
+    st.session_state.o_da_modificare = None
 
 g = st.session_state.g
 
@@ -322,7 +328,7 @@ if menu == "Tabellone Disponibilità":
                 else: st.button("🟢 Libera", key=f"btn_{casa}_{d}", use_container_width=True, disabled=True)
         st.markdown("---")
 
-    # Pannello di Gestione/Modifica
+    # Pannello di Gestione/Modifica Prenotazione
     if st.session_state.p_da_modificare:
         p_mod = st.session_state.p_da_modificare
         
@@ -424,7 +430,7 @@ if menu == "Tabellone Disponibilità":
                         st.rerun()
             else: st.session_state.p_da_modificare = None
 
-# --- SEZIONE PULIZIE & DASHBOARD AGGIORNATA (PASSAGGIO 2) ---
+# --- SEZIONE PULIZIE & DASHBOARD AGGIORNATA ---
 elif menu == "🧹 Pulizie & Dashboard Giornaliera":
     st.header("🧹 Piano di Lavoro Giornaliero")
     oggi = st.date_input("Seleziona Giorno di lavoro", date.today())
@@ -496,10 +502,11 @@ elif menu == "Gestione Prenotazioni":
                     st.success("Prenotazione registrata!")
                     st.rerun()
 
-# --- ANAGRAFICA OSPITI ---
+# --- ANAGRAFICA OSPITI (MODIFICATA CON MODIFICA ED ELIMINAZIONE) ---
 elif menu == "Anagrafica Ospiti":
     st.header("👥 Anagrafica Ospiti")
-    tab_o1, tab_o2 = st.tabs(["➕ Registra Nuovo Ospite", "📋 Elenco Clienti Salvati"])
+    tab_o1, tab_o2 = st.tabs(["➕ Registra Nuovo Ospite", "📋 Elenco Clienti & Modifica"])
+    
     with tab_o1:
         with st.form("form_ospite"):
             col_o1, col_o2 = st.columns(2)
@@ -528,11 +535,74 @@ elif menu == "Anagrafica Ospiti":
                     st.success(f"Ospite {n.upper()} {c.upper()} registrato!")
                     st.rerun()
                 else: st.error("Nome e Cognome obbligatori.")
+                
     with tab_o2:
-        tabella_ospiti = [{"ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), "Sesso": o.sesso, "Telefono": o.telefono, "Cittadinanza": o.cittadinanza, "Documento": o.documento, "Luogo Nascita": o.luogo_nascita, "Data Nascita": o.data_nascita} for o in g.ospiti]
-        st.dataframe(pd.DataFrame(tabella_ospiti), use_container_width=True, hide_index=True)
+        if not g.ospiti:
+            st.info("Nessun ospite registrato nel sistema.")
+        else:
+            # Dropdown per selezionare l'ospite da modificare o cancellare
+            opzioni_ricerca = {f"{o.cognome.upper()} {o.nome.upper()} (ID: {o.id})": o for o in g.ospiti}
+            elenco_nomi = sorted(list(opzioni_ricerca.keys()))
+            
+            st.markdown("### 🔍 Seleziona un Ospite per Modificarlo o Eliminarlo")
+            ospite_scelto_str = st.selectbox("Scegli Ospite:", ["-- Seleziona --"] + elenco_nomi)
+            
+            if ospite_scelto_str != "-- Seleziona --":
+                ospite_selezionato = opzioni_ricerca[ospite_scelto_str]
+                
+                # Form precompilato con i dati attuali dell'ospite
+                with st.form(key=f"form_modifica_ospite_{ospite_selezionato.id}"):
+                    st.markdown(f"#### ⚙️ Modifica dati di: {ospite_selezionato.nome.upper()} {ospite_selezionato.cognome.upper()}")
+                    
+                    col_m1, col_m2 = st.columns(2)
+                    with col_m1:
+                        m_nome = st.text_input("Nome", value=ospite_selezionato.nome)
+                        m_cognome = st.text_input("Cognome", value=ospite_selezionato.cognome)
+                        m_sesso = st.selectbox("Sesso", ["M", "F"], index=["M", "F"].index(ospite_selezionato.sesso))
+                        m_tel = st.text_input("Numero di Telefono", value=ospite_selezionato.telefono)
+                    with col_m2:
+                        m_luogo = st.text_input("Luogo di Nascita", value=ospite_selezionato.luogo_nascita)
+                        m_data = st.text_input("Data di Nascita (GG/MM/AAAA)", value=ospite_selezionato.data_nascita)
+                        m_doc = st.text_input("Numero Documento", value=ospite_selezionato.documento)
+                        m_cit = st.text_input("Cittadinanza", value=ospite_selezionato.cittadinanza)
+                    
+                    col_btn_m1, col_btn_m2, col_btn_m3 = st.columns(3)
+                    with col_btn_m1:
+                        btn_salva_o = st.form_submit_button("💾 Salva Modifiche Ospite", type="primary")
+                    with col_btn_m2:
+                        btn_cancella_o = st.form_submit_button("❌ Elimina definitivamente Ospite")
+                    with col_btn_m3:
+                        btn_annulla_o = st.form_submit_button("Annulla")
+                        
+                    if btn_salva_o:
+                        if m_nome and m_cognome:
+                            ospite_selezionato.nome = m_nome
+                            ospite_selezionato.cognome = m_cognome
+                            ospite_selezionato.sesso = m_sesso
+                            ospite_selezionato.telefono = m_tel
+                            ospite_selezionato.luogo_nascita = m_luogo
+                            ospite_selezionato.data_nascita = m_data
+                            ospite_selezionato.documento = m_doc
+                            ospite_selezionato.cittadinanza = m_cit
+                            g._salva_ospiti()
+                            st.success("Dati ospite aggiornati con successo!")
+                            st.rerun()
+                        else: st.error("Nome e Cognome sono obbligatori.")
+                        
+                    elif btn_cancella_o:
+                        g.elimina_ospite_obj(ospite_selezionato)
+                        st.success("Ospite rimosso dal database!")
+                        st.rerun()
+                        
+                    elif btn_annulla_o:
+                        st.rerun()
+            
+            st.markdown("---")
+            st.markdown("### 📋 Tabella Completa Ospiti Registrati")
+            tabella_ospiti = [{"ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), "Sesso": o.sesso, "Telefono": o.telefono, "Cittadinanza": o.cittadinanza, "Documento": o.documento, "Luogo Nascita": o.luogo_nascita, "Data Nascita": o.data_nascita} for o in g.ospiti]
+            st.dataframe(pd.DataFrame(tabella_ospiti), use_container_width=True, hide_index=True)
 
 # --- ELENCO CASE ---
 elif menu == "Elenco Case":
-    st.header("🏠 Elenco delle strutture generite")
+    st.header("🏠 Elenco delle strutture gestite")
     st.table(pd.DataFrame([{"Struttura": s.nome, "Capienza Massima": f"{s.max_ospiti} Persone", "Servizio Colazione Gestito": "Sì"} for s in g.stanze]))

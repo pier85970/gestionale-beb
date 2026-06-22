@@ -52,7 +52,7 @@ class GestionaleBnb:
         # ⚠️ LINK ICAL REAL TIME
         # =========================================================================
         self.URL_ICAL_BOOKING = {
-            "Casa Mariateresa": "https://ical.booking.com/v1/export?t=5bcde36e-d0a7-4d79-b30d-a777dc7378c6", 
+           "Casa Mariateresa": "https://ical.booking.com/v1/export?t=5bcde36e-d0a7-4d79-b30d-a777dc7378c6", 
             "Casa Antonetta": "https://ical.booking.com/v1/export?t=b5998ab5-6b80-4574-bbae-91543acbbf08", 
             "Casa Peppino": "https://ical.booking.com/v1/export?t=04546f5f-8e34-4fb7-b94e-3c1e2f274780" 
         }
@@ -253,7 +253,7 @@ def genera_link_whatsapp(p):
         f"* 🗓 Check-in: dalle 14:00 alle 21:00 (oltre le 21:00 è previsto un supplemento di 25€ per il late check-in)\n"
         f"* ⌛ Check-out: entro le ore 10:00\n"
         f"* 📍 Indirizzo: Via delle More, 70033 Corato BA\n"
-        f"* 🗺️ Posizione GPS: https://maps.google.com/?cid=7200396272994813162\n\n\n\n"
+        f"* 🗺️ Posizione GPS: https://maps.google.com/?cid=7200396272994813162\n\n"
         f"Se hai bisogno di indicazioni stradali, consigli su dove parcheggiare o suggerimenti sui posti migliori in zona, chiedi pure. Siamo a tua completa disposizione!\n\n"
         f"Buon viaggio e a presto!"
     )
@@ -454,7 +454,8 @@ elif menu == "🧹 Pulizie & Dashboard Giornaliera":
 
     st.markdown("---")
     st.markdown(f"### 📲 Messaggi di Benvenuto (In arrivo Domani: {domani.strftime('%d/%m/%Y')})")
-    arrivi_domani = [p for p in g.tutte_le_prenotazioni() if p.check_in == tomorrow]
+    
+    arrivi_domani = [p for p in g.tutte_le_prenotazioni() if p.check_in == domani]
     
     if not arrivi_domani:
         st.info("Nessun arrivo previsto per domani. Nessun messaggio da inviare.")
@@ -501,7 +502,7 @@ elif menu == "Gestione Prenotazioni":
                     st.success("Prenotazione registrata!")
                     st.rerun()
 
-# --- ANAGRAFICA OSPITI ---
+# --- ANAGRAFICA OSPITI (MODIFICATA CON MODIFICA ED ELIMINAZIONE) ---
 elif menu == "Anagrafica Ospiti":
     st.header("👥 Anagrafica Ospiti")
     tab_o1, tab_o2 = st.tabs(["➕ Registra Nuovo Ospite", "📋 Elenco Clienti & Modifica"])
@@ -539,6 +540,7 @@ elif menu == "Anagrafica Ospiti":
         if not g.ospiti:
             st.info("Nessun ospite registrato nel sistema.")
         else:
+            # Dropdown per selezionare l'ospite da modificare o cancellare
             opzioni_ricerca = {f"{o.cognome.upper()} {o.nome.upper()} (ID: {o.id})": o for o in g.ospiti}
             elenco_nomi = sorted(list(opzioni_ricerca.keys()))
             
@@ -548,6 +550,7 @@ elif menu == "Anagrafica Ospiti":
             if ospite_scelto_str != "-- Seleziona --":
                 ospite_selezionato = opzioni_ricerca[ospite_scelto_str]
                 
+                # Form precompilato con i dati attuali dell'ospite
                 with st.form(key=f"form_modifica_ospite_{ospite_selezionato.id}"):
                     st.markdown(f"#### ⚙️ Modifica dati di: {ospite_selezionato.nome.upper()} {ospite_selezionato.cognome.upper()}")
                     
@@ -590,14 +593,16 @@ elif menu == "Anagrafica Ospiti":
                         g.elimina_ospite_obj(ospite_selezionato)
                         st.success("Ospite rimosso dal database!")
                         st.rerun()
+                        
                     elif btn_annulla_o:
                         st.rerun()
+            
+            st.markdown("---")
+            st.markdown("### 📋 Tabella Completa Ospiti Registrati")
+            tabella_ospiti = [{"ID": o.id, "Cognome": o.cognome.upper(), "Nome": o.nome.upper(), "Sesso": o.sesso, "Telefono": o.telefono, "Cittadinanza": o.cittadinanza, "Documento": o.documento, "Luogo Nascita": o.luogo_nascita, "Data Nascita": o.data_nascita} for o in g.ospiti]
+            st.dataframe(pd.DataFrame(tabella_ospiti), use_container_width=True, hide_index=True)
 
-# --- SEZIONE: ELENCO CASE ---
+# --- ELENCO CASE ---
 elif menu == "Elenco Case":
-    st.header("🏠 Configurazione Strutture")
-    for s in g.stanze:
-        with st.container(border=True):
-            st.subheader(s.nome)
-            st.markdown(f"* **Capienza Massima:** {s.max_ospiti} ospiti")
-            st.markdown(f"* **Stato iCal Canale:** Connected ✅")
+    st.header("🏠 Elenco delle strutture gestite")
+    st.table(pd.DataFrame([{"Struttura": s.nome, "Capienza Massima": f"{s.max_ospiti} Persone", "Servizio Colazione Gestito": "Sì"} for s in g.stanze]))

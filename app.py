@@ -455,8 +455,7 @@ elif menu == "🧹 Pulizie & Dashboard Giornaliera":
     st.markdown("---")
     st.markdown(f"### 📲 Messaggi di Benvenuto (In arrivo Domani: {domani.strftime('%d/%m/%Y')})")
     
-    arrivi_domani = [p for p in g.tutte_le_prenotazioni() if p.check_in == tomorrow if hasattr(date, 'today') else g.tutte_le_prenotazioni()] # correzione logica comprensione lista per domani
-    arrivi_domani = [p for p in g.tutte_le_prenotazioni() if p.check_in == domani]
+   arrivi_domani = [p for p in g.tutte_le_prenotazioni() if p.check_in == tomorrow if hasattr(date, 'today') else g.tutte_le_prenotazioni()] # correzione logica comprensione lista per domani
     
     if not arrivi_domani:
         st.info("Nessun arrivo previsto per domani. Nessun messaggio da inviare.")
